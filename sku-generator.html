@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Ứng dụng sinh mã SKU</title>
+  <!-- Sử dụng React và Babel qua CDN để viết JSX -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    label { display: block; margin-top: 10px; }
+    input { margin-bottom: 10px; width: 100%; padding: 5px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    button { margin: 5px; padding: 5px 10px; }
+  </style>
+</head>
+<body>
+  <h1>Trình sinh mã SKU tự động</h1>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState } = React;
+
+    function App() {
+      // State cho các trường nhập và danh sách SKU
+      const [type, setType] = useState('');
+      const [color, setColor] = useState('');
+      const [size, setSize] = useState('');
+      const [attr, setAttr] = useState('');
+      const [skus, setSkus] = useState([]);
+
+      // Hàm viết tắt: lấy ký tự đầu của mỗi từ và chuyển thành chữ hoa
+      const abbreviate = (str) => {
+        return str
+          .trim()
+          .split(' ')
+          .filter(s => s)               // lọc bỏ chuỗi rỗng nếu có nhiều space
+          .map(s => s.charAt(0).toUpperCase())
+          .join('');
+      };
+
+      // Tạo SKU mới khi nhấn nút
+      const generateSKU = () => {
+        if (!type || !color || !size) {
+          alert('Vui lòng nhập đầy đủ loại sản phẩm, màu sắc và kích thước.');
+          return;
+        }
+        const t = abbreviate(type);    // Viết tắt loại sản phẩm
+        const c = abbreviate(color);   // Viết tắt màu sắc
+        const sz = size.toUpperCase(); // Kích thước (ví dụ L, XL)
+        const serial = (skus.length + 1).toString().padStart(3, '0'); // Số thứ tự 3 chữ số
+        const newSKU = `${t}-${c}-${sz}${attr ? '-' + attr.toUpperCase() : ''}-${serial}`;
+        // Kiểm tra trùng (nếu cần)
+        if (skus.some(item => item.sku === newSKU)) {
+          alert('Mã SKU đã tồn tại.'); 
+          return;
+        }
+        setSkus([...skus, { type, color, size: sz, attr, sku: newSKU }]);
+        // Xóa form
+        setType(''); setColor(''); setSize(''); setAttr('');
+      };
+
+      // Sao chép văn bản vào clipboard
+      const copyToClipboard = (text) => {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(() => {
+            alert('Đã sao chép: ' + text);
+          }).catch(err => {
+            console.error('Lỗi sao chép:', err);
+          });
+        } else {
+          // Fallback cho trình duyệt cũ
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');  // Sử dụng execCommand để copy&#8203;:contentReference[oaicite:6]{index=6}
+          textarea.remove();
+          alert('Đã sao chép: ' + text);
+        }
+      };
+
+      // Xuất danh sách SKU ra CSV
+      const exportCSV = () => {
+        if (skus.length === 0) {
+          alert('Danh sách SKU đang rỗng.');
+          return;
+        }
+        const header = ['Loại sản phẩm','Màu sắc','Kích thước','Thuộc tính','SKU'];
+        const rows = skus.map(item => [
+          item.type, item.color, item.size, item.attr, item.sku
+        ]);
+        const csvContent = [header, ...rows].map(e => e.join(',')).join('\\n');
+        // Tạo Blob và trigger download như ví dụ&#8203;:contentReference[oaicite:7]{index=7}
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'danh_sach_sku.csv';
+        a.click();
+      };
+
+      return (
+        <div>
+          {/* Form nhập thông tin sản phẩm */}
+          <label>Loại sản phẩm:</label>
+          <input 
+            value={type} 
+            onChange={e => setType(e.target.value)} 
+            placeholder="Ví dụ: Áo Thun" 
+          />
+          <label>Màu sắc:</label>
+          <input 
+            value={color} 
+            onChange={e => setColor(e.target.value)} 
+            placeholder="Ví dụ: Đỏ" 
+          />
+          <label>Kích thước:</label>
+          <input 
+            value={size} 
+            onChange={e => setSize(e.target.value)} 
+            placeholder="Ví dụ: L, XL" 
+          />
+          <label>Thuộc tính phụ (nếu có):</label>
+          <input 
+            value={attr} 
+            onChange={e => setAttr(e.target.value)} 
+            placeholder="Ví dụ: Nam, Nữ" 
+          />
+
+          <button onClick={generateSKU}>Tạo mã SKU</button>
+          <button onClick={exportCSV}>Xuất danh sách CSV</button>
+
+          {/* Bảng danh sách SKU */}
+          {skus.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Mã SKU</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skus.map((item, index) => (
+                  <tr key={index}>
+                    <td>{index + 1}</td>
+                    <td>{item.sku}</td>
+                    <td>
+                      <button onClick={() => copyToClipboard(item.sku)}>
+                        Sao chép
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
